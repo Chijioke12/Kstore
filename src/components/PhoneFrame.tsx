@@ -110,7 +110,7 @@ export default function PhoneFrame({ children, onKeyPress }: PhoneFrameProps) {
     }, 120);
   };
 
-  if ((import.meta as any).env?.PROD) {
+  if (process.env.NODE_ENV === 'production') {
     return (
       <div className="prod-mode" style={{ width: '100vw', height: '100vh', overflow: 'hidden', backgroundColor: '#000000', position: 'relative' }}>
         {children}
