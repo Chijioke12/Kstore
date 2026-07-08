@@ -5,6 +5,176 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#ee3024" />
     <title>My Google AI Studio App</title>
+    <script>
+      (function() {
+        // 1. Object.getOwnPropertyDescriptors
+        if (!Object.getOwnPropertyDescriptors) {
+          Object.getOwnPropertyDescriptors = function(obj) {
+            if (obj === null || obj === undefined) {
+              throw new TypeError('Cannot convert undefined or null to object');
+            }
+            var proto = Object(obj);
+            var descriptors = {};
+            var keys = Object.getOwnPropertyNames(proto);
+            if (Object.getOwnPropertySymbols) {
+              keys = keys.concat(Object.getOwnPropertySymbols(proto));
+            }
+            for (var i = 0; i < keys.length; i++) {
+              var key = keys[i];
+              var desc = Object.getOwnPropertyDescriptor(proto, key);
+              if (desc !== undefined) {
+                descriptors[key] = desc;
+              }
+            }
+            return descriptors;
+          };
+        }
+
+        // 2. Object.values
+        if (!Object.values) {
+          Object.values = function(obj) {
+            if (obj === null || obj === undefined) {
+              throw new TypeError('Cannot convert undefined or null to object');
+            }
+            var res = [];
+            for (var key in obj) {
+              if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                res.push(obj[key]);
+              }
+            }
+            return res;
+          };
+        }
+
+        // 3. Object.entries
+        if (!Object.entries) {
+          Object.entries = function(obj) {
+            if (obj === null || obj === undefined) {
+              throw new TypeError('Cannot convert undefined or null to object');
+            }
+            var res = [];
+            for (var key in obj) {
+              if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                res.push([key, obj[key]]);
+              }
+            }
+            return res;
+          };
+        }
+
+        // 4. Object.fromEntries
+        if (!Object.fromEntries) {
+          Object.fromEntries = function(entries) {
+            if (!entries) {
+              throw new TypeError('Object.fromEntries() requires an iterable');
+            }
+            var obj = {};
+            if (Array.isArray(entries)) {
+              for (var i = 0; i < entries.length; i++) {
+                var pair = entries[i];
+                if (pair && pair.length >= 2) {
+                  obj[pair[0]] = pair[1];
+                }
+              }
+            } else if (typeof Symbol !== 'undefined' && entries[Symbol.iterator]) {
+              var iterator = entries[Symbol.iterator]();
+              var next = iterator.next();
+              while (!next.done) {
+                var pair = next.value;
+                if (pair && pair.length >= 2) {
+                  obj[pair[0]] = pair[1];
+                }
+                next = iterator.next();
+              }
+            }
+            return obj;
+          };
+        }
+
+        // 5. Promise.prototype.finally
+        if (typeof Promise !== 'undefined' && !Promise.prototype.finally) {
+          Promise.prototype.finally = function(callback) {
+            var constructor = this.constructor;
+            return this.then(
+              function(value) {
+                return constructor.resolve(callback()).then(function() { return value; });
+              },
+              function(reason) {
+                return constructor.resolve(callback()).then(function() { throw reason; });
+              }
+            );
+          };
+        }
+
+        // 6. Array.prototype.flat
+        if (!Array.prototype.flat) {
+          Array.prototype.flat = function(depth) {
+            var d = depth === undefined ? 1 : Number(depth);
+            var flatten = function(arr, currentDepth) {
+              if (currentDepth <= 0) {
+                return arr.slice();
+              }
+              var res = [];
+              for (var i = 0; i < arr.length; i++) {
+                var val = arr[i];
+                if (Array.isArray(val)) {
+                  res = res.concat(flatten(val, currentDepth - 1));
+                } else {
+                  res.push(val);
+                }
+              }
+              return res;
+            };
+            return flatten(this, d);
+          };
+        }
+
+        // 7. Array.prototype.flatMap
+        if (!Array.prototype.flatMap) {
+          Array.prototype.flatMap = function(callback, thisArg) {
+            var mapped = [];
+            for (var i = 0; i < this.length; i++) {
+              mapped.push(callback.call(thisArg, this[i], i, this));
+            }
+            return mapped.flat();
+          };
+        }
+
+        // 8. String.prototype.padStart
+        if (!String.prototype.padStart) {
+          String.prototype.padStart = function(targetLength, padString) {
+            targetLength = targetLength >> 0;
+            padString = String(padString !== undefined ? padString : ' ');
+            if (this.length > targetLength) {
+              return String(this);
+            } else {
+              targetLength = targetLength - this.length;
+              if (targetLength > padString.length) {
+                padString += padString.repeat(targetLength / padString.length);
+              }
+              return padString.slice(0, targetLength) + String(this);
+            }
+          };
+        }
+
+        // 9. String.prototype.padEnd
+        if (!String.prototype.padEnd) {
+          String.prototype.padEnd = function(targetLength, padString) {
+            targetLength = targetLength >> 0;
+            padString = String(padString !== undefined ? padString : ' ');
+            if (this.length > targetLength) {
+              return String(this);
+            } else {
+              targetLength = targetLength - this.length;
+              if (targetLength > padString.length) {
+                padString += padString.repeat(targetLength / padString.length);
+              }
+              return String(this) + padString.slice(0, targetLength);
+            }
+          };
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
