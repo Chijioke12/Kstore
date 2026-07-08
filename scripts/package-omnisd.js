@@ -22,6 +22,11 @@ async function buildAndPackage() {
       '.ts': 'ts',
       '.css': 'css',
     },
+    alias: {
+      'react': 'preact/compat',
+      'react-dom': 'preact/compat',
+      'react/jsx-runtime': 'preact/compat/jsx-runtime',
+    },
   });
   
   console.log('Classic JS build completed.');
@@ -30,34 +35,18 @@ async function buildAndPackage() {
   const htmlPath = 'dist/index.html';
   let html = fs.readFileSync(htmlPath, 'utf8');
   
-  // We want to find the built CSS file name
-  const cssFileMatch = html.match(/href="\/assets\/(index-[^"]+\.css)"/) || html.match(/href="\.?\/assets\/(index-[^"]+\.css)"/);
-  const cssFileName = cssFileMatch ? cssFileMatch[1] : null;
-  
-  // Rewrite HTML completely to load index-classic.js as classic script and keep CSS
-  // Also we must make sure ALL paths are relative (using \'./assets/...\') for KaiOS file:// system
-  let cssHref = cssFileName ? `./assets/${cssFileName}` : '';
-  if (!cssHref) {
-    // Look for any css files in dist/assets
-    try {
-      const files = fs.readdirSync('dist/assets');
-      const cssFile = files.find(f => f.endsWith('.css'));
-      if (cssFile) {
-        cssHref = `./assets/${cssFile}`;
-      }
-    } catch (e) {
-      // Ignored
-    }
-  }
+  // Use the esbuild generated index-classic.css directly!
+  const cssHref = './assets/index-classic.css';
   
   html = `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#ee3024" />
     <title>KaiStore</title>
     <script src="./assets/index-classic.js" defer></script>
-    ${cssHref ? `<link rel="stylesheet" href="${cssHref}">` : ''}
+    <link rel="stylesheet" href="${cssHref}">
   </head>
   <body>
     <div id="root"></div>
@@ -126,9 +115,20 @@ async function buildAndPackage() {
     console.log('Warning: Generated icon not found, using placeholder');
   }
   
-  // 5. Create application.zip containing all contents of dist/
+  // 5. Create application.zip containing only the required files for KaiOS
   const appZip = new AdmZip();
-  appZip.addLocalFolder('dist');
+  appZip.addLocalFile('dist/index.html');
+  appZip.addLocalFile('dist/manifest.webapp');
+  appZip.addLocalFile('dist/assets/index-classic.js', 'assets');
+  if (fs.existsSync('dist/assets/index-classic.css')) {
+    appZip.addLocalFile('dist/assets/index-classic.css', 'assets');
+  }
+  if (fs.existsSync('dist/assets/icon-56.png')) {
+    appZip.addLocalFile('dist/assets/icon-56.png', 'assets');
+  }
+  if (fs.existsSync('dist/assets/icon-112.png')) {
+    appZip.addLocalFile('dist/assets/icon-112.png', 'assets');
+  }
   appZip.writeZip('application.zip');
   console.log('Created application.zip');
   
