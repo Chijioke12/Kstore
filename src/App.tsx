@@ -60,7 +60,6 @@ export default function App() {
             const rating = 4.0 + (regApp.name.length % 10) / 10;
             const reviewsCount = (regApp.name.length * 143) % 2000 + 50;
             const version = regApp.version || '1.0.0';
-
             return {
               id: regApp.id,
               name: regApp.name,
@@ -77,7 +76,6 @@ export default function App() {
               type: regApp.type,
             };
           });
-
           setApps(mappedRegistryApps);
         }
       })
@@ -85,6 +83,72 @@ export default function App() {
         console.error('Failed to load apps from registry', err);
       });
   }, []);
+
+  // Sync with system apps
+  useEffect(() => {
+    if (apps.length === 0) return;
+    const nav = navigator as any;
+    if (!nav.mozApps || !nav.mozApps.mgmt) return;
+
+    const syncSystemApps = () => {
+      const request = nav.mozApps.mgmt.getAll();
+      request.onsuccess = function (this: any) {
+        const installedSystemApps = this.result || [];
+        const newInstalledIds: string[] = [];
+        const newInstalledVersions: Record<string, string> = {};
+
+        apps.forEach((app) => {
+          let isMatch = false;
+          let matchedSystemApp = null;
+          for (const sysApp of installedSystemApps) {
+            const manifestURL = sysApp.manifestURL;
+            const targetManifest = app.type === 'hosted' 
+              ? app.manifest_url 
+              : `app://${app.id}/manifest.webapp`;
+            
+            if (manifestURL === targetManifest || manifestURL === app.manifest_url) {
+              isMatch = true;
+              matchedSystemApp = sysApp;
+              break;
+            }
+            const installedName = (sysApp.manifest && sysApp.manifest.name) || '';
+            const checkingName = app.name || '';
+            if (installedName && checkingName && installedName.toLowerCase().trim() === checkingName.toLowerCase().trim()) {
+              isMatch = true;
+              matchedSystemApp = sysApp;
+              break;
+            }
+          }
+
+          if (isMatch && matchedSystemApp) {
+            newInstalledIds.push(app.id);
+            const manifest = matchedSystemApp.manifest || matchedSystemApp.updateManifest;
+            newInstalledVersions[app.id] = (manifest && manifest.version) ? manifest.version : '1.0.0';
+          }
+        });
+
+        setInstalledAppIds(newInstalledIds);
+        setInstalledAppVersions(newInstalledVersions);
+        try {
+          localStorage.setItem('kai_installed_apps', JSON.stringify(newInstalledIds));
+          localStorage.setItem('kai_installed_app_versions', JSON.stringify(newInstalledVersions));
+        } catch (e) {
+          console.warn('localStorage write error', e);
+        }
+      };
+    };
+
+    syncSystemApps();
+
+    nav.mozApps.mgmt.oninstall = (event: any) => {
+      console.log("System-wide app installed:", event?.application?.manifestURL);
+      syncSystemApps();
+    };
+    nav.mozApps.mgmt.onuninstall = (event: any) => {
+      console.log("System-wide app uninstalled:", event?.application?.manifestURL);
+      syncSystemApps();
+    };
+  }, [apps]);
 
   // Triggered on any physical or virtual key press
   const handleKeyPress = (key: KeyCode) => {
@@ -154,8 +218,74 @@ export default function App() {
   const handleLaunchApp = (appId: string) => {
     const targetApp = apps.find((a) => a.id === appId);
     if (targetApp) {
-      setRunningApp(targetApp);
-      setScreen('app_running');
+      const nav = navigator as any;
+      const launchWithMozActivity = () => {
+        if ((window as any).MozActivity) {
+          const manifestURL = targetApp.type === 'hosted' 
+            ? targetApp.manifest_url 
+            : `app://${targetApp.id}/manifest.webapp`;
+          
+          try {
+            new (window as any).MozActivity({
+              name: "open",
+              data: {
+                type: "window",
+                manifestURL: manifestURL
+              }
+            });
+            return true;
+          } catch (e) {
+            console.warn("MozActivity failed", e);
+          }
+        }
+        return false;
+      };
+
+      if (nav.mozApps && nav.mozApps.mgmt) {
+        const request = nav.mozApps.mgmt.getAll();
+        request.onsuccess = function(this: any) {
+          const installedApps = this.result || [];
+          let localApp = null;
+          
+          for (let i = 0; i < installedApps.length; i++) {
+            const app = installedApps[i];
+            const manifestURL = app.manifestURL;
+            const targetManifest = targetApp.type === 'hosted' 
+              ? targetApp.manifest_url 
+              : `app://${targetApp.id}/manifest.webapp`;
+            
+            if (manifestURL === targetManifest || manifestURL === targetApp.manifest_url) {
+              localApp = app;
+              break;
+            }
+          }
+          
+          if (localApp && typeof localApp.launch === 'function') {
+            localApp.launch();
+            return;
+          }
+          
+          if (!launchWithMozActivity()) {
+             setRunningApp(targetApp);
+             setScreen('app_running');
+          }
+        };
+        request.onerror = function() {
+          if (!launchWithMozActivity()) {
+             setRunningApp(targetApp);
+             setScreen('app_running');
+          }
+        };
+      } else if (nav.mozApps) {
+        if (!launchWithMozActivity()) {
+           setRunningApp(targetApp);
+           setScreen('app_running');
+        }
+      } else {
+        // Fallback to simulation
+        setRunningApp(targetApp);
+        setScreen('app_running');
+      }
     }
   };
 

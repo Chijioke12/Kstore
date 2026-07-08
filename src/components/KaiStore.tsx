@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, memo } from 'react';
 import {
   CheckCircle2,
   AlertCircle,
@@ -40,7 +40,104 @@ interface KaiStoreProps {
 
 type StoreView = 'TABS' | 'APP_LIST' | 'DETAIL' | 'SEARCH';
 
+const renderLucide = (iconName: string, className = 'w-6 h-6') => {
+  if (iconName && (iconName.startsWith('http://') || iconName.startsWith('https://') || iconName.startsWith('/') || iconName.includes('.'))) {
+    return (
+      <img 
+        src={iconName} 
+        alt="icon" 
+        className={`${className} object-contain`} 
+        onError={(e) => {
+          (e.currentTarget as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-help-circle"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>';
+        }}
+      />
+    );
+  }
+
+  const IconComp = (Icons as any)[iconName] || Icons.HelpCircle;
+  return <IconComp className={className} />;
+};
+
+const renderStars = (rating: number) => {
+  const stars = [];
+  const floor = Math.floor(rating);
+  for (let i = 1; i <= 5; i++) {
+    if (i <= floor) {
+      stars.push(<Icons.Star key={i} className="w-3 h-3 fill-yellow-400 text-yellow-400" />);
+    } else {
+      stars.push(<Icons.Star key={i} className="w-3 h-3 text-neutral-300" />);
+    }
+  }
+  return <div className="flex gap-0.5">{stars}</div>;
+};
+
 const CATEGORIES = ['Featured', 'Games', 'Utilities', 'Books', 'Lifestyle'] as const;
+
+const AppRow = memo(({ 
+  app, 
+  isActive, 
+  isInstalled, 
+  hasUpdate, 
+  installedVer,
+  renderLucide,
+  renderStars
+}: any) => {
+  return (
+    <div className={`store-app-row ${isActive ? 'active' : ''}`}>
+      <div className="store-app-row-icon-box">
+        {renderLucide(app.icon, 'store-app-icon')}
+      </div>
+      <div className="store-app-meta">
+        <div className="store-app-row-header">
+          <h4 className="store-app-row-title">{app.name}</h4>
+          {isInstalled && (
+            hasUpdate ? (
+              <span className="store-app-row-badge" style={{ backgroundColor: '#ea580c', color: '#ffffff', borderColor: '#c2410c' }}>
+                Update
+              </span>
+            ) : (
+              <span className="store-app-row-badge">
+                Installed
+              </span>
+            )
+          )}
+        </div>
+        <p className="store-app-row-dev">{app.developer}</p>
+        <div className="store-stars-group">
+          {renderStars(app.rating)}
+          <span className="store-rating-count">({app.reviewsCount})</span>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+const SearchRow = memo(({
+  app,
+  isActive,
+  onClick,
+  renderLucide
+}: any) => {
+  return (
+    <div
+      className={`store-search-row ${isActive ? 'active' : ''}`}
+      onClick={() => onClick(app)}
+    >
+      <div className="store-search-row-icon">
+        {renderLucide(app.icon, 'store-search-app-icon')}
+      </div>
+      <div className="store-search-row-title-box">
+        <h4 className="store-search-row-title">{app.name}</h4>
+        <p className="store-search-row-cat">{app.category}</p>
+      </div>
+      {isActive && (
+        <span className="store-search-highlight-badge">
+          View LSK
+        </span>
+      )}
+    </div>
+  );
+});
 
 export default function KaiStore({
   installedAppIds,
@@ -425,8 +522,9 @@ export default function KaiStore({
           if (!nav.mozApps || typeof nav.mozApps.install !== 'function') {
             throw new Error('mozApps.install is not available');
           }
+
           const request = nav.mozApps.install(manifestUrl);
-          request.onsuccess = () => {
+          request.onsuccess = async () => {
             setDownloadStep('INSTALLED');
             onInstallApp(appId, app.version);
             setDownloadProgress(null);
@@ -489,7 +587,7 @@ export default function KaiStore({
              throw new Error('import/importPublish API not found');
           }
 
-          request.onsuccess = () => {
+          request.onsuccess = async () => {
             setDownloadStep('INSTALLED');
             onInstallApp(appId, app.version);
             setDownloadProgress(null);
@@ -525,37 +623,6 @@ export default function KaiStore({
         }
       }, 250);
     }
-  };
-
-  const renderLucide = (iconName: string, className = 'w-6 h-6') => {
-    if (iconName && (iconName.startsWith('http://') || iconName.startsWith('https://') || iconName.startsWith('/') || iconName.includes('.'))) {
-      return (
-        <img 
-          src={iconName} 
-          alt="icon" 
-          className={`${className} object-contain`} 
-          onError={(e) => {
-            (e.currentTarget as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-help-circle"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>';
-          }}
-        />
-      );
-    }
-    const IconComponent = (Icons as any)[iconName] || Icons.HelpCircle;
-    return <IconComponent className={className} />;
-  };
-
-  // Star Rating view
-  const renderStars = (rating: number) => {
-    const stars = [];
-    const floor = Math.floor(rating);
-    for (let i = 1; i <= 5; i++) {
-      if (i <= floor) {
-        stars.push(<Icons.Star key={i} className="w-3 h-3 fill-yellow-400 text-yellow-400" />);
-      } else {
-        stars.push(<Icons.Star key={i} className="w-3 h-3 text-neutral-300" />);
-      }
-    }
-    return <div className="flex gap-0.5">{stars}</div>;
   };
 
   if (storeView === 'TABS' || storeView === 'APP_LIST') {
@@ -614,38 +681,16 @@ export default function KaiStore({
               const hasUpdate = isInstalled && app.version && (app.version !== installedVer);
 
               return (
-                <div
+                <AppRow 
                   key={app.id}
-                  className={`store-app-row ${isActive ? 'active' : ''}`}
-                >
-                  {/* Icon */}
-                  <div className="store-app-row-icon-box">
-                    {renderLucide(app.icon, 'store-app-icon')}
-                  </div>
-
-                  {/* App Text Metadata */}
-                  <div className="store-app-meta">
-                    <div className="store-app-row-header">
-                      <h4 className="store-app-row-title">{app.name}</h4>
-                      {isInstalled && (
-                        hasUpdate ? (
-                          <span className="store-app-row-badge" style={{ backgroundColor: '#ea580c', color: '#ffffff', borderColor: '#c2410c' }}>
-                            Update
-                          </span>
-                        ) : (
-                          <span className="store-app-row-badge">
-                            Installed
-                          </span>
-                        )
-                      )}
-                    </div>
-                    <p className="store-app-row-dev">{app.developer}</p>
-                    <div className="store-stars-group">
-                      {renderStars(app.rating)}
-                      <span className="store-rating-count">({app.reviewsCount})</span>
-                    </div>
-                  </div>
-                </div>
+                  app={app}
+                  isActive={isActive}
+                  isInstalled={isInstalled}
+                  hasUpdate={hasUpdate}
+                  installedVer={installedVer}
+                  renderLucide={renderLucide}
+                  renderStars={renderStars}
+                />
               );
             })
           )}
@@ -873,27 +918,16 @@ export default function KaiStore({
             searchedApps.map((app, idx) => {
               const isActive = idx === searchListFocusIdx;
               return (
-                <div
+                <SearchRow
                   key={app.id}
-                  className={`store-search-row ${isActive ? 'active' : ''}`}
-                  onClick={() => {
-                    setSelectedApp(app);
+                  app={app}
+                  isActive={isActive}
+                  onClick={(appToSelect: any) => {
+                    setSelectedApp(appToSelect);
                     setStoreView('DETAIL');
                   }}
-                >
-                  <div className="store-search-row-icon">
-                    {renderLucide(app.icon, 'store-search-app-icon')}
-                  </div>
-                  <div className="store-search-row-title-box">
-                    <h4 className="store-search-row-title">{app.name}</h4>
-                    <p className="store-search-row-cat">{app.category}</p>
-                  </div>
-                  {isActive && (
-                    <span className="store-search-highlight-badge">
-                      View LSK
-                    </span>
-                  )}
-                </div>
+                  renderLucide={renderLucide}
+                />
               );
             })
           )}
