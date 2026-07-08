@@ -71,6 +71,9 @@ async function buildAndPackage() {
       "systemXHR": {
         "description": "Required to fetch registry catalog and download apps."
       },
+      "webapps-manage": {
+        "description": "Required to handle app installations via importPublish API."
+      },
       "deviceStorage:apps": {
         "access": "readwrite",
         "description": "Required to handle app installations and updates if supported."

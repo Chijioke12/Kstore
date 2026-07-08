@@ -416,10 +416,14 @@ export default function KaiStore({
     }
 
     const nav = navigator as any;
-    const hasRealInstaller = typeof nav !== 'undefined' && nav.mozApps && nav.mozApps.mgmt && typeof nav.mozApps.mgmt.importPublish === 'function';
+    const isDevMode = (import.meta as any).env?.DEV;
 
-    if (hasRealInstaller) {
+    if (!isDevMode) {
       try {
+        if (!nav.mozApps || !nav.mozApps.mgmt || typeof nav.mozApps.mgmt.importPublish !== 'function') {
+          throw new Error('mozApps.mgmt.importPublish is not available');
+        }
+
         const urlToFetch = app.download_url || app.manifest_url || `/apps/${app.id}.zip`;
         const response = await fetch(urlToFetch);
         if (!response.ok) {
@@ -768,10 +772,10 @@ export default function KaiStore({
             <div className="store-tech-row" style={{borderTop: '1px dashed #e5e5e5', paddingTop: '4px'}}>
               <span>OmniSD Engine:</span>
               <span className="store-tech-val" style={{
-                color: typeof (navigator as any) !== 'undefined' && (navigator as any).mozApps?.mgmt?.importPublish ? '#16a34a' : '#4f46e5',
+                color: !(import.meta as any).env?.DEV ? '#16a34a' : '#4f46e5',
                 fontWeight: 600
               }}>
-                {typeof (navigator as any) !== 'undefined' && (navigator as any).mozApps?.mgmt?.importPublish ? 'Active (API)' : 'Emulated (Sandbox)'}
+                {!(import.meta as any).env?.DEV ? 'Active (API)' : 'Emulated (Sandbox)'}
               </span>
             </div>
           </div>
