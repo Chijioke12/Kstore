@@ -45,11 +45,11 @@ async function buildAndPackage() {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#ee3024" />
     <title>KaiStore</title>
-    <script src="./assets/index-classic.js" defer></script>
     <link rel="stylesheet" href="${cssHref}">
   </head>
   <body>
     <div id="root"></div>
+    <script src="./assets/index-classic.js"></script>
   </body>
 </html>`;
 

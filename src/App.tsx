@@ -8,15 +8,29 @@ export default function App() {
   const [screen, setScreen] = useState<'store' | 'app_running'>('store');
   const [activeKey, setActiveKey] = useState<KeyCode | null>(null);
   const [installedAppIds, setInstalledAppIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem('kai_installed_apps');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('kai_installed_apps');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.warn('localStorage read error', e);
+      return [];
+    }
   });
   const [installedAppVersions, setInstalledAppVersions] = useState<Record<string, string>>(() => {
-    const saved = localStorage.getItem('kai_installed_app_versions');
-    return saved ? JSON.parse(saved) : {};
+    try {
+      const saved = localStorage.getItem('kai_installed_app_versions');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      console.warn('localStorage read error', e);
+      return {};
+    }
   });
   const [soundEnabled] = useState(() => {
-    return localStorage.getItem('kai_sound_enabled') !== 'false';
+    try {
+      return localStorage.getItem('kai_sound_enabled') !== 'false';
+    } catch (e) {
+      return true;
+    }
   });
 
   const [apps, setApps] = useState<AppItem[]>([]);
@@ -95,13 +109,21 @@ export default function App() {
   const handleInstallApp = (appId: string, version?: string) => {
     setInstalledAppIds((prev) => {
       const updated = prev.includes(appId) ? prev : [...prev, appId];
-      localStorage.setItem('kai_installed_apps', JSON.stringify(updated));
+      try {
+        localStorage.setItem('kai_installed_apps', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('localStorage write error', e);
+      }
       return updated;
     });
     if (version) {
       setInstalledAppVersions((prev) => {
         const updated = { ...prev, [appId]: version };
-        localStorage.setItem('kai_installed_app_versions', JSON.stringify(updated));
+        try {
+          localStorage.setItem('kai_installed_app_versions', JSON.stringify(updated));
+        } catch (e) {
+          console.warn('localStorage write error', e);
+        }
         return updated;
       });
     }
