@@ -31,6 +31,7 @@ interface KaiStoreProps {
   installedAppIds: string[];
   installedAppVersions: Record<string, string>;
   onInstallApp: (appId: string, version?: string) => void;
+  onUninstallApp: (appId: string) => void;
   onLaunchApp: (appId: string) => void;
   activeKey: string | null;
   onClearKey: () => void;
@@ -139,10 +140,72 @@ const SearchRow = memo(({
   );
 });
 
+function uninstallSilently(app: AppItem): Promise<void> {
+  return new Promise((resolve) => {
+    const nav = navigator as any;
+    if (!nav.mozApps || !nav.mozApps.mgmt) {
+      resolve();
+      return;
+    }
+    
+    const request = nav.mozApps.mgmt.getAll();
+    request.onsuccess = function(this: any) {
+      const installedApps = this.result || [];
+      let appToUninstall = null;
+      
+      for (let i = 0; i < installedApps.length; i++) {
+        const installedApp = installedApps[i];
+        const installedName = (installedApp.manifest && installedApp.manifest.name) || '';
+        const checkingName = app.name || '';
+        
+        let isMatch = false;
+        if (app.type === 'hosted') {
+          if (installedApp.manifestURL === app.manifest_url) {
+            isMatch = true;
+          }
+        } else {
+          const targetManifest = "app://" + app.id + "/manifest.webapp";
+          if (installedApp.manifestURL === targetManifest || installedApp.manifestURL === app.manifest_url) {
+            isMatch = true;
+          }
+        }
+        
+        if (!isMatch && installedName && checkingName && installedName.toLowerCase().trim() === checkingName.toLowerCase().trim()) {
+          isMatch = true;
+        }
+        
+        if (isMatch) {
+          appToUninstall = installedApp;
+          break;
+        }
+      }
+      
+      if (appToUninstall) {
+        let uninstReq;
+        if (nav.mozApps.mgmt && typeof nav.mozApps.mgmt.uninstall === 'function') {
+          uninstReq = nav.mozApps.mgmt.uninstall(appToUninstall);
+        } else if (typeof appToUninstall.uninstall === 'function') {
+          uninstReq = appToUninstall.uninstall();
+        } else {
+          resolve();
+          return;
+        }
+        
+        uninstReq.onsuccess = () => resolve();
+        uninstReq.onerror = () => resolve();
+      } else {
+        resolve();
+      }
+    };
+    request.onerror = () => resolve();
+  });
+}
+
 export default function KaiStore({
   installedAppIds,
   installedAppVersions,
   onInstallApp,
+  onUninstallApp,
   onLaunchApp,
   activeKey,
   onClearKey,
@@ -349,7 +412,9 @@ export default function KaiStore({
           break;
         case 'SoftLeft':
           if (selectedApp && isInstalled) {
-            onLaunchApp(selectedApp.id);
+            uninstallSilently(selectedApp).then(() => {
+              onUninstallApp(selectedApp.id);
+            });
           }
           break;
         case 'Key0':
@@ -528,6 +593,9 @@ export default function KaiStore({
             setDownloadStep('INSTALLED');
             onInstallApp(appId, app.version);
             setDownloadProgress(null);
+            setTimeout(() => {
+              setDownloadStep('IDLE');
+            }, 2000);
           };
           request.onerror = function(this: any) {
              const errName = this.error ? this.error.name : 'Unknown error';
@@ -591,8 +659,11 @@ export default function KaiStore({
             setDownloadStep('INSTALLED');
             onInstallApp(appId, app.version);
             setDownloadProgress(null);
+            setTimeout(() => {
+              setDownloadStep('IDLE');
+            }, 2000);
           };
-
+          
           request.onerror = function(this: any) {
             const errName = this.error ? this.error.name : 'Unknown installation error';
             setDownloadStep('ERROR');
@@ -619,6 +690,9 @@ export default function KaiStore({
             setDownloadStep('INSTALLED');
             onInstallApp(appId, app.version);
             setDownloadProgress(null);
+            setTimeout(() => {
+              setDownloadStep('IDLE');
+            }, 2000);
           }, 1200);
         }
       }, 250);
@@ -859,13 +933,13 @@ export default function KaiStore({
 
         {/* Softkeys */}
         <div className="launcher-grid-footer" style={{backgroundColor: '#fafafa'}}>
-          <div style={{color: '#4f46e5', fontWeight: 700}}>
-            {isInstalled ? 'LAUNCH (LSK)' : ''}
+          <div style={{color: '#ef4444', fontWeight: 700}}>
+            {isInstalled ? 'UNINSTALL (LSK)' : ''}
           </div>
           <div style={{color: '#171717', fontWeight: 700}}>
             {hasUpdate ? 'UPDATE' : isInstalled ? 'LAUNCH' : 'INSTALL'}
           </div>
-          <div style={{color: '#ef4444'}}>BACK</div>
+          <div style={{color: '#737373'}}>BACK</div>
         </div>
       </div>
     );

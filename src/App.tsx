@@ -170,6 +170,28 @@ export default function App() {
   };
 
   // Synced state persistence
+  const handleUninstallApp = (appId: string) => {
+    setInstalledAppIds((prev) => {
+      const updated = prev.filter(id => id !== appId);
+      try {
+        localStorage.setItem('kai_installed_apps', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('localStorage write error', e);
+      }
+      return updated;
+    });
+    setInstalledAppVersions((prev) => {
+      const updated = { ...prev };
+      delete updated[appId];
+      try {
+        localStorage.setItem('kai_installed_app_versions', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('localStorage write error', e);
+      }
+      return updated;
+    });
+  };
+
   const handleInstallApp = (appId: string, version?: string) => {
     setInstalledAppIds((prev) => {
       const updated = prev.includes(appId) ? prev : [...prev, appId];
@@ -254,7 +276,17 @@ export default function App() {
               ? targetApp.manifest_url 
               : `app://${targetApp.id}/manifest.webapp`;
             
+            let isMatch = false;
             if (manifestURL === targetManifest || manifestURL === targetApp.manifest_url) {
+              isMatch = true;
+            }
+            const installedName = (app.manifest && app.manifest.name) || '';
+            const checkingName = targetApp.name || '';
+            if (installedName && checkingName && installedName.toLowerCase().trim() === checkingName.toLowerCase().trim()) {
+              isMatch = true;
+            }
+
+            if (isMatch) {
               localApp = app;
               break;
             }
@@ -306,6 +338,7 @@ export default function App() {
               installedAppIds={installedAppIds}
               installedAppVersions={installedAppVersions}
               onInstallApp={handleInstallApp}
+              onUninstallApp={handleUninstallApp}
               onLaunchApp={handleLaunchApp}
               activeKey={activeKey}
               onClearKey={clearKey}
