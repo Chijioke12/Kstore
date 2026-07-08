@@ -1,0 +1,6 @@
+{
+  "name": "KaiOS Store",
+  "description": "An interactive, high-fidelity KaiOS Store simulator, complete with a physical phone frame, keypad-controlled D-pad navigation, category browsing, app installations, and playable mini-apps.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
