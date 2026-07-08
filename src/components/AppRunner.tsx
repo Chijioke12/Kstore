@@ -1,6 +1,30 @@
 import { useEffect, useState, useRef } from 'react';
-import * as Icons from 'lucide-react';
+import {
+  Smartphone,
+  Video,
+  Volume2,
+  PlayCircle,
+  DownloadCloud,
+  Trophy,
+  BookOpen,
+  ChevronRight,
+  Heart,
+  Frown
+} from 'lucide-react';
 import { AppItem, KeyCode } from '../types';
+
+const Icons = {
+  Smartphone,
+  Video,
+  Volume2,
+  PlayCircle,
+  DownloadCloud,
+  Trophy,
+  BookOpen,
+  ChevronRight,
+  Heart,
+  Frown
+};
 
 interface AppRunnerProps {
   app: AppItem;

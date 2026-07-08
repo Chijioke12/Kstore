@@ -1,6 +1,32 @@
 import { useEffect, useState, useRef } from 'react';
-import * as Icons from 'lucide-react';
+import {
+  CheckCircle2,
+  AlertCircle,
+  Search,
+  ShoppingBag,
+  Star,
+  RefreshCw,
+  Play,
+  Download,
+  AlertTriangle,
+  Loader2,
+  HelpCircle
+} from 'lucide-react';
 import { AppItem, KaiScreen } from '../types';
+
+const Icons = {
+  CheckCircle2,
+  AlertCircle,
+  Search,
+  ShoppingBag,
+  Star,
+  RefreshCw,
+  Play,
+  Download,
+  AlertTriangle,
+  Loader2,
+  HelpCircle
+};
 interface KaiStoreProps {
   installedAppIds: string[];
   installedAppVersions: Record<string, string>;

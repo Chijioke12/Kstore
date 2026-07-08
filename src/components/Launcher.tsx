@@ -1,7 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
-import * as Icons from 'lucide-react';
+import { HelpCircle } from 'lucide-react';
 import { PREINSTALLED_APPS } from '../data/apps';
 import { AppItem } from '../types';
+
+const Icons = {
+  HelpCircle,
+};
 
 interface LauncherProps {
   installedAppIds: string[];
