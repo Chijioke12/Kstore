@@ -419,60 +419,91 @@ export default function KaiStore({
     const isDevMode = (import.meta as any).env?.DEV;
 
     if (!isDevMode) {
-      try {
-        if (!nav.mozApps || !nav.mozApps.mgmt || typeof nav.mozApps.mgmt.importPublish !== 'function') {
-          throw new Error('mozApps.mgmt.importPublish is not available');
+      if (app.type === 'hosted') {
+        const manifestUrl = app.manifest_url || '';
+        try {
+          if (!nav.mozApps || typeof nav.mozApps.install !== 'function') {
+            throw new Error('mozApps.install is not available');
+          }
+          const request = nav.mozApps.install(manifestUrl);
+          request.onsuccess = () => {
+            setDownloadStep('INSTALLED');
+            onInstallApp(appId, app.version);
+            setDownloadProgress(null);
+          };
+          request.onerror = function(this: any) {
+             const errName = this.error ? this.error.name : 'Unknown error';
+             setDownloadStep('ERROR');
+             setErrorMessage(`Install failed: ${errName}`);
+          };
+        } catch (e: any) {
+          setDownloadStep('ERROR');
+          setErrorMessage(e.message || 'Install failed');
         }
-
+      } else {
         const urlToFetch = app.download_url || app.manifest_url || `/apps/${app.id}.zip`;
-        const response = await fetch(urlToFetch);
-        if (!response.ok) {
-          throw new Error(`HTTP Error ${response.status}: Failed to fetch package zip`);
-        }
-
-        const contentLength = response.headers.get('content-length');
-        const total = contentLength ? parseInt(contentLength, 10) : 0;
-        let loaded = 0;
-
-        const reader = response.body?.getReader();
-        const chunks: Uint8Array[] = [];
-
-        if (reader) {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            if (value) {
-              chunks.push(value);
-              loaded += value.length;
-              if (total > 0) {
-                setDownloadProgress(Math.round((loaded / total) * 100));
+        const downloadBlob = (url: string): Promise<Blob> => {
+          return new Promise((resolve, reject) => {
+            let xhr: XMLHttpRequest;
+            try {
+              xhr = new (window as any).XMLHttpRequest({ mozSystem: true });
+            } catch (e) {
+              xhr = new XMLHttpRequest();
+            }
+            xhr.open('GET', url, true);
+            xhr.responseType = 'blob';
+            xhr.onprogress = (e) => {
+              if (e.lengthComputable && e.total > 0) {
+                setDownloadProgress(Math.round((e.loaded / e.total) * 100));
               } else {
                 setDownloadProgress((prev) => Math.min((prev ?? 0) + 10, 95));
               }
-            }
+            };
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                resolve(xhr.response);
+              } else {
+                reject(new Error(`HTTP Error ${xhr.status}`));
+              }
+            };
+            xhr.onerror = () => reject(new Error('Network request failed'));
+            xhr.send();
+          });
+        };
+
+        try {
+          const blob = await downloadBlob(urlToFetch);
+          setDownloadProgress(100);
+          setDownloadStep('INSTALLING');
+
+          if (!nav.mozApps || !nav.mozApps.mgmt) {
+             throw new Error('mozApps.mgmt is missing (jailbroken?)');
           }
-        }
+          
+          let request;
+          if (typeof nav.mozApps.mgmt.import === 'function') {
+             request = nav.mozApps.mgmt.import(blob);
+          } else if (typeof nav.mozApps.mgmt.importPublish === 'function') {
+             request = nav.mozApps.mgmt.importPublish(blob);
+          } else {
+             throw new Error('import/importPublish API not found');
+          }
 
-        setDownloadProgress(100);
-        setDownloadStep('INSTALLING');
+          request.onsuccess = () => {
+            setDownloadStep('INSTALLED');
+            onInstallApp(appId, app.version);
+            setDownloadProgress(null);
+          };
 
-        const blob = new Blob(chunks, { type: 'application/zip' });
-        const request = nav.mozApps.mgmt.importPublish(blob);
-
-        request.onsuccess = () => {
-          setDownloadStep('INSTALLED');
-          onInstallApp(appId, app.version);
-          setDownloadProgress(null);
-        };
-
-        request.onerror = function(this: any) {
-          const errName = this.error ? this.error.name : 'Unknown installation error';
+          request.onerror = function(this: any) {
+            const errName = this.error ? this.error.name : 'Unknown installation error';
+            setDownloadStep('ERROR');
+            setErrorMessage(errName);
+          };
+        } catch (err: any) {
           setDownloadStep('ERROR');
-          setErrorMessage(errName);
-        };
-      } catch (err: any) {
-        setDownloadStep('ERROR');
-        setErrorMessage(err.message || 'Fetch failed');
+          setErrorMessage(err.message || 'Fetch failed');
+        }
       }
     } else {
       // Simulation mode

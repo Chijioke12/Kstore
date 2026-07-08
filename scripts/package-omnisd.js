@@ -72,7 +72,7 @@ async function buildAndPackage() {
         "description": "Required to fetch registry catalog and download apps."
       },
       "webapps-manage": {
-        "description": "Required to handle app installations via importPublish API."
+        "description": "Required to handle app installations via import API."
       },
       "deviceStorage:apps": {
         "access": "readwrite",
