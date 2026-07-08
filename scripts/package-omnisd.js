@@ -12,13 +12,15 @@ async function buildAndPackage() {
   
   let html = fs.readFileSync(htmlPath, 'utf8');
   
-  // Find legacy files in dist/assets
   const assetsDir = 'dist/assets';
   if (!fs.existsSync(assetsDir)) {
     throw new Error('Assets directory not found inside dist/. Ensure build completed.');
   }
   const assetFiles = fs.readdirSync(assetsDir);
+  
+  // Find all legacy building blocks dynamically
   const polyfillsFile = assetFiles.find(f => f.startsWith('polyfills-legacy-') && f.endsWith('.js'));
+  const vendorFile = assetFiles.find(f => f.startsWith('vendor-legacy-') && f.endsWith('.js'));
   const legacyEntryFile = assetFiles.find(f => f.startsWith('index-legacy-') && f.endsWith('.js'));
 
   if (!polyfillsFile || !legacyEntryFile) {
@@ -30,30 +32,32 @@ async function buildAndPackage() {
   fs.writeFileSync(path.join(assetsDir, 'load-legacy.js'), loaderContent);
   console.log(`Created load-legacy.js targeting ${legacyEntryFile}`);
 
-  // Strip all existing script tags to comply with strict KaiOS certified app CSP (which forbids inline scripts)
+  // Strip ALL inline and modern module script tags safely
   let cleanHtml = html.replace(/<script\b[\s\S]*?<\/script>/gi, '');
 
-  // Make other asset paths relative (e.g. stylesheets)
-  cleanHtml = cleanHtml.replace(/href="\/assets\//g, 'href="./assets/');
+  // Robustly catch both single and double-quoted absolute paths for CSS / assets
+  cleanHtml = cleanHtml.replace(/(href|src)=["']\/assets\//gi, '$1="./assets/');
 
-  // Inject the clean legacy script tags (zero inline scripts) just before body close
-  const scriptInjections = `
-    <script src="./assets/${polyfillsFile}"></script>
-    <script src="./assets/load-legacy.js"></script>
-  </body>`;
+  // Inject the legacy scripts in strict dependency order (Polyfills -> Vendor -> Loader)
+  let scriptInjections = `\n    <script src="./assets/${polyfillsFile}"></script>`;
+  if (vendorFile) {
+    scriptInjections += `\n    <script src="./assets/${vendorFile}"></script>`;
+  }
+  scriptInjections += `\n    <script src="./assets/load-legacy.js"></script>\n  </body>`;
   
   cleanHtml = cleanHtml.replace('</body>', scriptInjections);
   
   fs.writeFileSync(htmlPath, cleanHtml);
   console.log('Rewrote index.html to load legacy files cleanly with zero inline scripts.');
   
-  // 3. Create manifest.webapp inside dist/
+  // Write Manifest with explicit CSP to guarantee execution under privileged/certified rules
   const manifest = {
     "name": "KaiStore",
-    "description": "An alternative open-source App Store client for KaiOS, allowing you to browse, search, and sideload apps from the custom catalog.",
+    "description": "An alternative open-source App Store client for KaiOS.",
     "version": "1.0.0",
     "launch_path": "/index.html",
-    "type": "certified",
+    "type": "certified", // Kept certified as requested by user
+    "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src *; img-src 'self' data:;",
     "icons": {
       "56": "/assets/icon-56.png",
       "112": "/assets/icon-112.png"
@@ -78,7 +82,7 @@ async function buildAndPackage() {
   fs.writeFileSync('dist/manifest.webapp', JSON.stringify(manifest, null, 2));
   console.log('Created manifest.webapp');
   
-  // 4. Create/copy icons to dist/assets
+  // Handle icons
   const imgDir = 'src/assets/images';
   let generatedImgPath = null;
   try {
@@ -89,55 +93,42 @@ async function buildAndPackage() {
         generatedImgPath = path.join(imgDir, imgFile);
       }
     }
-  } catch (e) {
-    // Ignored
-  }
+  } catch (e) {}
   
   if (generatedImgPath) {
     try {
       fs.copyFileSync(generatedImgPath, 'dist/assets/icon-56.png');
       fs.copyFileSync(generatedImgPath, 'dist/assets/icon-112.png');
-      console.log(`Copied icon from ${generatedImgPath}`);
     } catch (e) {
       console.error('Failed to copy icons:', e);
     }
-  } else {
-    console.log('Warning: Generated icon not found, using placeholder');
   }
   
-  // 5. Create application.zip containing only the required files for KaiOS
+  // Build packages
   const appZip = new AdmZip();
   appZip.addLocalFile('dist/index.html');
   appZip.addLocalFile('dist/manifest.webapp');
   appZip.addLocalFolder('dist/assets', 'assets');
   appZip.writeZip('application.zip');
-  console.log('Created application.zip');
   
-  // 6. Create update.webapp (empty file)
   fs.writeFileSync('update.webapp', '');
-  console.log('Created empty update.webapp');
   
-  // 7. Create metadata.json for OmniSD
   const metadata = {
     "version": 1,
     "manifestURL": "app://kaistore.omnisd/manifest.webapp"
   };
   fs.writeFileSync('metadata.json.omnisd', JSON.stringify(metadata, null, 2));
-  console.log('Created metadata.json.omnisd');
   
-  // 8. Create the outer omnisd zip package: kaistore-omnisd.zip
   const outerZip = new AdmZip();
   outerZip.addLocalFile('application.zip');
   outerZip.addLocalFile('update.webapp');
   outerZip.addFile('metadata.json', fs.readFileSync('metadata.json.omnisd'));
   outerZip.writeZip('kaistore-omnisd.zip');
-  console.log('Created OmniSD Package: kaistore-omnisd.zip');
   
-  // Clean up intermediate local files to keep workspace tidy
   fs.unlinkSync('application.zip');
   fs.unlinkSync('update.webapp');
   fs.unlinkSync('metadata.json.omnisd');
-  console.log('Cleaned up intermediate zip files.');
+  console.log('🏁 Successfully generated OmniSD Package: kaistore-omnisd.zip');
 }
 
 buildAndPackage().catch(err => {
