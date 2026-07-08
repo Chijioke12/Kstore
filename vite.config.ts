@@ -1,10 +1,17 @@
 import preact from '@preact/preset-vite';
 import path from 'path';
 import {defineConfig} from 'vite';
+import legacy from '@vitejs/plugin-legacy';
 
 export default defineConfig(() => {
   return {
-    plugins: [preact()],
+    plugins: [
+      preact(),
+      legacy({
+        targets: ['firefox 48'],
+        renderLegacyChunks: true,
+      }),
+    ],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
