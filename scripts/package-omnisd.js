@@ -12,13 +12,40 @@ async function buildAndPackage() {
   
   let html = fs.readFileSync(htmlPath, 'utf8');
   
-  // Make all asset paths relative so they load correctly on KaiOS (using app:// or file:// protocols)
-  html = html.replace(/href="\/assets\//g, 'href="./assets/');
-  html = html.replace(/src="\/assets\//g, 'src="./assets/');
-  html = html.replace(/data-src="\/assets\//g, 'data-src="./assets/');
+  // Find legacy files in dist/assets
+  const assetsDir = 'dist/assets';
+  if (!fs.existsSync(assetsDir)) {
+    throw new Error('Assets directory not found inside dist/. Ensure build completed.');
+  }
+  const assetFiles = fs.readdirSync(assetsDir);
+  const polyfillsFile = assetFiles.find(f => f.startsWith('polyfills-legacy-') && f.endsWith('.js'));
+  const legacyEntryFile = assetFiles.find(f => f.startsWith('index-legacy-') && f.endsWith('.js'));
+
+  if (!polyfillsFile || !legacyEntryFile) {
+    throw new Error('Vite legacy assets not found in dist/assets. Check vite.config.ts configuration.');
+  }
+
+  // Create clean external loader script
+  const loaderContent = `System.import('./assets/${legacyEntryFile}');\n`;
+  fs.writeFileSync(path.join(assetsDir, 'load-legacy.js'), loaderContent);
+  console.log(`Created load-legacy.js targeting ${legacyEntryFile}`);
+
+  // Strip all existing script tags to comply with strict KaiOS certified app CSP (which forbids inline scripts)
+  let cleanHtml = html.replace(/<script\b[\s\S]*?<\/script>/gi, '');
+
+  // Make other asset paths relative (e.g. stylesheets)
+  cleanHtml = cleanHtml.replace(/href="\/assets\//g, 'href="./assets/');
+
+  // Inject the clean legacy script tags (zero inline scripts) just before body close
+  const scriptInjections = `
+    <script src="./assets/${polyfillsFile}"></script>
+    <script src="./assets/load-legacy.js"></script>
+  </body>`;
   
-  fs.writeFileSync(htmlPath, html);
-  console.log('Rewrote index.html for relative paths.');
+  cleanHtml = cleanHtml.replace('</body>', scriptInjections);
+  
+  fs.writeFileSync(htmlPath, cleanHtml);
+  console.log('Rewrote index.html to load legacy files cleanly with zero inline scripts.');
   
   // 3. Create manifest.webapp inside dist/
   const manifest = {
