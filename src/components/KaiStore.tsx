@@ -589,7 +589,7 @@ export default function KaiStore({
     }
   };
 
-  // Real or simulated download & install process (OmniSD importPublish API)
+  // Real or simulated download & install process
   const startDownload = async (appId: string) => {
     setDownloadStep('DOWNLOADING');
     setDownloadProgress(0);
@@ -632,8 +632,8 @@ export default function KaiStore({
           setErrorMessage(e.message || 'Install failed');
         }
       } else {
-        // Use official OTA installPackage method if available and a mini-manifest URL is provided
-        if (typeof nav.mozApps.installPackage === 'function' && app.manifest_url && app.manifest_url.endsWith('.webapp')) {
+        // Use official OTA installPackage method
+        if (typeof nav.mozApps.installPackage === 'function' && app.manifest_url) {
           try {
             const request = nav.mozApps.installPackage(app.manifest_url);
             request.onsuccess = async () => {
@@ -650,77 +650,13 @@ export default function KaiStore({
               setErrorMessage(errName);
             };
             return;
-          } catch (e) {
-            console.warn('installPackage failed, falling back to blob import', e);
-          }
-        }
-
-        // Fallback to manual Blob download and OmniSD importPublish API
-        const urlToFetch = app.download_url || app.manifest_url || `/apps/${app.id}.zip`;
-        const downloadBlob = (url: string): Promise<Blob> => {
-          return new Promise((resolve, reject) => {
-            let xhr: XMLHttpRequest;
-            try {
-              xhr = new (window as any).XMLHttpRequest({ mozSystem: true });
-            } catch (e) {
-              xhr = new XMLHttpRequest();
-            }
-            xhr.open('GET', url, true);
-            xhr.responseType = 'blob';
-            xhr.onprogress = (e) => {
-              if (e.lengthComputable && e.total > 0) {
-                setDownloadProgress(Math.round((e.loaded / e.total) * 100));
-              } else {
-                setDownloadProgress((prev) => Math.min((prev ?? 0) + 10, 95));
-              }
-            };
-            xhr.onload = () => {
-              if (xhr.status >= 200 && xhr.status < 300) {
-                resolve(xhr.response);
-              } else {
-                reject(new Error(`HTTP Error ${xhr.status}`));
-              }
-            };
-            xhr.onerror = () => reject(new Error('Network request failed'));
-            xhr.send();
-          });
-        };
-
-        try {
-          const blob = await downloadBlob(urlToFetch);
-          setDownloadProgress(100);
-          setDownloadStep('INSTALLING');
-
-          if (!nav.mozApps || !nav.mozApps.mgmt) {
-             throw new Error('mozApps.mgmt is missing (jailbroken?)');
-          }
-          
-          let request;
-          if (typeof nav.mozApps.mgmt.import === 'function') {
-             request = nav.mozApps.mgmt.import(blob);
-          } else if (typeof nav.mozApps.mgmt.importPublish === 'function') {
-             request = nav.mozApps.mgmt.importPublish(blob);
-          } else {
-             throw new Error('import/importPublish API not found');
-          }
-
-          request.onsuccess = async () => {
-            setDownloadStep('INSTALLED');
-            onInstallApp(appId, app.version);
-            setDownloadProgress(null);
-            setTimeout(() => {
-              setDownloadStep('IDLE');
-            }, 2000);
-          };
-          
-          request.onerror = function(this: any) {
-            const errName = this.error ? this.error.name : 'Unknown installation error';
+          } catch (e: any) {
             setDownloadStep('ERROR');
-            setErrorMessage(errName);
-          };
-        } catch (err: any) {
+            setErrorMessage(e.message || 'Install failed');
+          }
+        } else {
           setDownloadStep('ERROR');
-          setErrorMessage(err.message || 'Fetch failed');
+          setErrorMessage('Official installation API not available');
         }
       }
     } else {
@@ -968,15 +904,6 @@ export default function KaiStore({
                 <span className="store-tech-val" style={{ fontWeight: 600, color: hasUpdate ? '#ea580c' : '#16a34a' }}>v{installedVer}</span>
               </div>
             )}
-            <div className="store-tech-row" style={{borderTop: '1px dashed #e5e5e5', paddingTop: '4px'}}>
-              <span>OmniSD Engine:</span>
-              <span className="store-tech-val" style={{
-                color: !(import.meta as any).env?.DEV ? '#16a34a' : '#4f46e5',
-                fontWeight: 600
-              }}>
-                {!(import.meta as any).env?.DEV ? 'Active (API)' : 'Emulated (Sandbox)'}
-              </span>
-            </div>
           </div>
         </div>
 
