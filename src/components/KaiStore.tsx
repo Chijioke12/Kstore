@@ -607,6 +607,30 @@ export default function KaiStore({
           setErrorMessage(e.message || 'Install failed');
         }
       } else {
+        // Use official OTA installPackage method if available and a mini-manifest URL is provided
+        if (typeof nav.mozApps.installPackage === 'function' && app.manifest_url && app.manifest_url.endsWith('.webapp')) {
+          try {
+            const request = nav.mozApps.installPackage(app.manifest_url);
+            request.onsuccess = async () => {
+              setDownloadStep('INSTALLED');
+              onInstallApp(appId, app.version);
+              setDownloadProgress(null);
+              setTimeout(() => {
+                setDownloadStep('IDLE');
+              }, 2000);
+            };
+            request.onerror = function(this: any) {
+              const errName = this.error ? this.error.name : 'Unknown installation error';
+              setDownloadStep('ERROR');
+              setErrorMessage(errName);
+            };
+            return;
+          } catch (e) {
+            console.warn('installPackage failed, falling back to blob import', e);
+          }
+        }
+
+        // Fallback to manual Blob download and OmniSD importPublish API
         const urlToFetch = app.download_url || app.manifest_url || `/apps/${app.id}.zip`;
         const downloadBlob = (url: string): Promise<Blob> => {
           return new Promise((resolve, reject) => {
