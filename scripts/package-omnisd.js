@@ -114,7 +114,22 @@ async function buildAndPackage() {
   appZip.addLocalFolder('dist/assets', 'assets');
   appZip.writeZip('application.zip');
   
-  fs.writeFileSync('update.webapp', '');
+  // For OmniSD/KaiOS packaged apps, update.webapp must be a valid mini-manifest
+  const updateWebapp = {
+    "name": "KaiStore",
+    "description": "An alternative open-source App Store client for KaiOS.",
+    "version": "1.0.0",
+    "developer": {
+      "name": "KaiStore Team",
+      "url": "https://github.com/Chijioke12/Open-KaiStore-Registry"
+    },
+    "package_path": "application.zip",
+    "icons": {
+      "56": "/assets/icon-56.png",
+      "112": "/assets/icon-112.png"
+    }
+  };
+  fs.writeFileSync('update.webapp', JSON.stringify(updateWebapp, null, 2));
   
   const metadata = {
     "version": 1,

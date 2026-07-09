@@ -603,9 +603,9 @@ export default function KaiStore({
     }
 
     const nav = navigator as any;
-    const isDevMode = (import.meta as any).env?.DEV;
+    const hasRealMozApps = !!(nav.mozApps && (nav.mozApps.install || nav.mozApps.installPackage));
 
-    if (!isDevMode) {
+    if (hasRealMozApps) {
       if (app.type === 'hosted') {
         const manifestUrl = app.manifest_url || '';
         try {
@@ -614,7 +614,17 @@ export default function KaiStore({
           }
 
           const request = nav.mozApps.install(manifestUrl);
-          request.onsuccess = async () => {
+          request.onsuccess = function(this: any) {
+            const appObj = request.result || this.result;
+            if (appObj) {
+              console.log('App install request succeeded:', appObj);
+              appObj.ondownloaderror = (e: any) => {
+                const dError = appObj.downloadError ? appObj.downloadError.name : 'Unknown download error';
+                console.error('ondownloaderror fired:', dError, e);
+                setDownloadStep('ERROR');
+                setErrorMessage(`Bg download fail: ${dError}. Url: ${manifestUrl}`);
+              };
+            }
             setDownloadStep('INSTALLED');
             onInstallApp(appId, app.version);
             setDownloadProgress(null);
@@ -623,9 +633,16 @@ export default function KaiStore({
             }, 2000);
           };
           request.onerror = function(this: any) {
-             const errName = this.error ? this.error.name : 'Unknown error';
-             setDownloadStep('ERROR');
-             setErrorMessage(`Install failed: ${errName}`);
+            const reqErr = request.error || this.error;
+            let errName = 'Unknown error';
+            let errMsg = '';
+            if (reqErr) {
+              errName = reqErr.name || reqErr.toString();
+              errMsg = reqErr.message || '';
+            }
+            console.error('install failed request.onerror:', reqErr);
+            setDownloadStep('ERROR');
+            setErrorMessage(`Install err: [${errName}]${errMsg ? ' ' + errMsg : ''}. Url: ${manifestUrl}`);
           };
         } catch (e: any) {
           setDownloadStep('ERROR');
@@ -636,7 +653,17 @@ export default function KaiStore({
         if (typeof nav.mozApps.installPackage === 'function' && app.manifest_url) {
           try {
             const request = nav.mozApps.installPackage(app.manifest_url);
-            request.onsuccess = async () => {
+            request.onsuccess = function(this: any) {
+              const appObj = request.result || this.result;
+              if (appObj) {
+                console.log('App installPackage request succeeded:', appObj);
+                appObj.ondownloaderror = (e: any) => {
+                  const dError = appObj.downloadError ? appObj.downloadError.name : 'Unknown download error';
+                  console.error('ondownloaderror fired:', dError, e);
+                  setDownloadStep('ERROR');
+                  setErrorMessage(`Bg pkg download fail: ${dError}. Url: ${app.manifest_url}`);
+                };
+              }
               setDownloadStep('INSTALLED');
               onInstallApp(appId, app.version);
               setDownloadProgress(null);
@@ -645,9 +672,16 @@ export default function KaiStore({
               }, 2000);
             };
             request.onerror = function(this: any) {
-              const errName = this.error ? this.error.name : 'Unknown installation error';
+              const reqErr = request.error || this.error;
+              let errName = 'Unknown error';
+              let errMsg = '';
+              if (reqErr) {
+                errName = reqErr.name || reqErr.toString();
+                errMsg = reqErr.message || '';
+              }
+              console.error('installPackage failed request.onerror:', reqErr);
               setDownloadStep('ERROR');
-              setErrorMessage(errName);
+              setErrorMessage(`Pkg install err: [${errName}]${errMsg ? ' ' + errMsg : ''}. Url: ${app.manifest_url}`);
             };
             return;
           } catch (e: any) {
@@ -839,6 +873,16 @@ export default function KaiStore({
               </div>
             )}
 
+            {downloadStep === 'IDLE' && (selectedApp.type === 'privileged' || selectedApp.type === 'certified') && (
+              <div style={{ marginTop: '6px', fontSize: '8px', padding: '5px 8px', borderRadius: '4px', backgroundColor: '#fef2f2', border: '1px solid #fee2e2', color: '#991b1b', lineHeight: '1.2' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold', marginBottom: '2px' }}>
+                  <Icons.AlertTriangle style={{ width: '10px', height: '10px', color: '#dc2626' }} />
+                  <span>Unsigned App Notice</span>
+                </div>
+                <span>This is a <strong>{selectedApp.type}</strong> package. Installing directly on stock devices may trigger background signature verification failure ("Install Error") and automatic uninstallation. Sideloading via OmniSD or WebIDE is recommended!</span>
+              </div>
+            )}
+
             {downloadStep === 'DOWNLOADING' && (
               <div className="store-progress-card">
                 <div className="store-progress-header">
@@ -869,9 +913,12 @@ export default function KaiStore({
             )}
 
             {downloadStep === 'ERROR' && (
-              <div className="store-installed-status" style={{color: '#ef4444', borderColor: '#fee2e2', backgroundColor: '#fef2f2'}}>
-                <Icons.AlertCircle className="store-star-icon" />
-                <span style={{fontSize: '9px', fontWeight: 600}}>ACTION FAIL: {errorMessage || 'Unknown API Error'}</span>
+              <div className="store-installed-status" style={{color: '#ef4444', borderColor: '#fee2e2', backgroundColor: '#fef2f2', height: 'auto', padding: '6px', flexDirection: 'column', alignItems: 'flex-start', gap: '4px'}}>
+                <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
+                  <Icons.AlertCircle className="store-star-icon" style={{width: '12px', height: '12px'}} />
+                  <span style={{fontSize: '9px', fontWeight: 700}}>INSTALL FAIL</span>
+                </div>
+                <span style={{fontSize: '8px', fontWeight: 500, wordBreak: 'break-all', textAlign: 'left', lineHeight: '1.2'}}>{errorMessage || 'Unknown API Error'}</span>
               </div>
             )}
           </div>
@@ -898,6 +945,12 @@ export default function KaiStore({
               <span>Category:</span>
               <span className="store-tech-val">{selectedApp.category}</span>
             </div>
+            {selectedApp.type && (
+              <div className="store-tech-row">
+                <span>App Type:</span>
+                <span className="store-tech-val" style={{ textTransform: 'capitalize' }}>{selectedApp.type}</span>
+              </div>
+            )}
             {isInstalled && (
               <div className="store-tech-row">
                 <span>Installed Version:</span>

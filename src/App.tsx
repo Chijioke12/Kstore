@@ -84,7 +84,7 @@ export default function App() {
       });
   }, []);
 
-  // Sync with system apps
+  // Sync with system apps - Active on real KaiOS devices with the mozApps management API
   useEffect(() => {
     if (apps.length === 0) return;
     const nav = navigator as any;
