@@ -49,27 +49,51 @@ async function packageOmniSD() {
 
   addDirectoryToZip(appZip, distDir);
   
-  // Save application.zip to memory or temp
+  // 3. Create the update.webapp (metadata for OmniSD/Store)
+  // Check if manifest.webapp exists in dist, if not generate it for application.zip
+  let manifestData = null;
+  const manifestPath = path.join(distDir, 'manifest.webapp');
+  if (fs.existsSync(manifestPath)) {
+    try {
+      manifestData = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    } catch (e) {
+      console.warn('Could not parse manifest.webapp');
+    }
+  }
+
+  if (!manifestData) {
+    console.log('Generating manifest.webapp for application.zip...');
+    manifestData = {
+      name: appName.charAt(0).toUpperCase() + appName.slice(1).replace(/-/g, ' '),
+      description: "KaiOS Store Application",
+      version: "1.0.0",
+      launch_path: "/index.html",
+      icons: {
+        "56": "/assets/kaistore_icon_56.png",
+        "112": "/assets/kaistore_icon_112.png",
+        "128": "/assets/kaistore_icon_128.png"
+      },
+      developer: {
+        name: "KaiOS",
+        url: "http://kaiostech.com"
+      },
+      type: "privileged",
+      permissions: {},
+      default_locale: "en-US"
+    };
+    appZip.addFile('manifest.webapp', Buffer.from(JSON.stringify(manifestData, null, 2)));
+  }
+
+  const version = manifestData.version || '1.0.0';
   const appZipBuffer = appZip.toBuffer();
   console.log('Built application.zip');
 
-  // 3. Create the update.webapp (metadata for OmniSD/Store)
-  // We need to extract the manifest from dist/manifest.webapp to get the version
-  let version = '1.0.0';
-  try {
-    const manifestPath = path.join(distDir, 'manifest.webapp');
-    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    version = manifest.version || '1.0.0';
-  } catch (e) {
-    console.warn('Could not read manifest.webapp, using version 1.0.0');
-  }
-
   const updateWebapp = {
-    name: appName,
+    name: manifestData.name,
     version: version,
     size: appZipBuffer.length,
     package_path: 'application.zip',
-    icons: {
+    icons: manifestData.icons || {
       "128": "/assets/kaistore_icon_128.png"
     }
   };
@@ -79,14 +103,17 @@ async function packageOmniSD() {
   finalZip.addFile('application.zip', appZipBuffer);
   finalZip.addFile('update.webapp', Buffer.from(JSON.stringify(updateWebapp, null, 2)));
   
-  // Add a placeholder icon if it exists in assets
+  // Add icon to the root or assets folder if it exists
   const iconPath = path.join(rootDir, 'src/assets/images/kaistore_icon_1783509088775.jpg');
   if (fs.existsSync(iconPath)) {
-    // OmniSD usually expects icons in a specific path within the zip if defined in update.webapp
+    finalZip.addLocalFile(iconPath, '', 'kaistore_icon_128.png');
+    // Also add to assets for internal manifest reference if needed
     finalZip.addLocalFile(iconPath, 'assets', 'kaistore_icon_128.png');
+    finalZip.addLocalFile(iconPath, 'assets', 'kaistore_icon_112.png');
+    finalZip.addLocalFile(iconPath, 'assets', 'kaistore_icon_56.png');
   }
 
-  const outputName = `${appName}-omnisd.zip`;
+  const outputName = `kaistore-omnisd.zip`;
   const outputPath = path.join(rootDir, outputName);
   
   finalZip.writeZip(outputPath);
