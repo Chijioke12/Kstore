@@ -38,7 +38,7 @@ export default function App() {
 
   // Load database from external registry URL
   useEffect(() => {
-    fetch('https://raw.githubusercontent.com/Chijioke12/Open-KaiStore-Registry/refs/heads/main/apps.json')
+    fetch('https://chijioke12.github.io/Open-KaiStore-Registry/apps.json')
       .then((res) => res.json())
       .then((data) => {
         if (data && Array.isArray(data.apps)) {
