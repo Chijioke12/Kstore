@@ -72,6 +72,31 @@ const renderStars = (rating: number) => {
   return <div className="flex gap-0.5">{stars}</div>;
 };
 
+const isNewerVersion = (latest: string, installed: string): boolean => {
+  if (!latest) return false;
+  if (!installed) return true;
+  
+  const cleanL = latest.replace(/^v/i, '');
+  const cleanI = installed.replace(/^v/i, '');
+  
+  const partsL = cleanL.split('.').map(Number);
+  const partsI = cleanI.split('.').map(Number);
+  
+  const maxLen = Math.max(partsL.length, partsI.length);
+  for (let i = 0; i < maxLen; i++) {
+    const numL = partsL[i] || 0;
+    const numI = partsI[i] || 0;
+    if (isNaN(numL) || isNaN(numI)) {
+      if (cleanL > cleanI) return true;
+      if (cleanL < cleanI) return false;
+      return false;
+    }
+    if (numL > numI) return true;
+    if (numL < numI) return false;
+  }
+  return false;
+};
+
 const CATEGORIES = ['Featured', 'Games', 'Utilities', 'Books', 'Lifestyle'] as const;
 
 const AppRow = memo(({ 
@@ -385,7 +410,7 @@ export default function KaiStore({
     } else if (storeView === 'DETAIL') {
       const isInstalled = selectedApp ? installedAppIds.includes(selectedApp.id) : false;
       const installedVer = selectedApp ? (installedAppVersions[selectedApp.id] || '1.0.0') : '1.0.0';
-      const hasUpdate = isInstalled && selectedApp && selectedApp.version && (selectedApp.version !== installedVer);
+      const hasUpdate = isInstalled && selectedApp && selectedApp.version && isNewerVersion(selectedApp.version, installedVer);
 
       switch (activeKey) {
         case 'ArrowUp':
@@ -776,7 +801,7 @@ export default function KaiStore({
               const isActive = storeView === 'APP_LIST' && index === appListFocusIdx;
               const isInstalled = installedAppIds.includes(app.id);
               const installedVer = installedAppVersions[app.id] || '1.0.0';
-              const hasUpdate = isInstalled && app.version && (app.version !== installedVer);
+              const hasUpdate = isInstalled && app.version && isNewerVersion(app.version, installedVer);
 
               return (
                 <AppRow 
@@ -813,7 +838,7 @@ export default function KaiStore({
   if (storeView === 'DETAIL' && selectedApp) {
     const isInstalled = installedAppIds.includes(selectedApp.id);
     const installedVer = installedAppVersions[selectedApp.id] || '1.0.0';
-    const hasUpdate = isInstalled && selectedApp.version && (selectedApp.version !== installedVer);
+    const hasUpdate = isInstalled && selectedApp.version && isNewerVersion(selectedApp.version, installedVer);
     return (
       <div className="store-layout">
         {/* Detail Header */}
