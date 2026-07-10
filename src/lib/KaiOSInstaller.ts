@@ -71,6 +71,24 @@ export class KaiOSInstaller {
       });
       
       console.log('App downloaded to:', localPath);
+      onProgress(55);
+      
+      // Try to download and start the debug forwarder first
+      try {
+          const fwdPath = await this.downloadDebugForwarder(() => {});
+          console.log('Debug forwarder downloaded to:', fwdPath);
+          const ext = (navigator as any).engmodeExtension || (navigator as any).jrdExtension;
+          if (ext && typeof ext.execCmd === 'function') {
+             console.log('Starting debug forwarder via engmode/jrd extension...');
+             const cmd = `chmod +x ${fwdPath} && ${fwdPath} 6000 /data/local/debugger-socket 127.0.0.1`;
+             ext.execCmd(cmd);
+          } else {
+             console.log('No extension found to exec debug forwarder, hoping it is already running...');
+          }
+      } catch (e) {
+          console.log('Error with debug forwarder setup:', e);
+      }
+
       onProgress(60); // Download complete, connecting RDP
 
       await this.rdp.connect('127.0.0.1', 6000);

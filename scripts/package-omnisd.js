@@ -56,7 +56,7 @@ async function buildAndPackage() {
     "description": "An alternative open-source App Store client for KaiOS.",
     "version": "1.0.1",
     "launch_path": "/index.html",
-    "type": "privileged", // Changed to privileged to avoid INVALID_SIGNATURE for users without full root
+    "type": "certified",
     "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src *; img-src 'self' data:;",
     "icons": {
       "56": "/assets/icon-56.png",
@@ -71,12 +71,22 @@ async function buildAndPackage() {
       "systemXHR": {
         "description": "Required to fetch registry catalog and download apps."
       },
+      "webapps-manage": {
+        "description": "Required to handle app installations via import API."
+      },
+      "deviceStorage:apps": {
+        "access": "readwrite",
+        "description": "Required to handle app installations and updates if supported."
+      },
       "deviceStorage:sdcard": {
         "access": "readwrite",
         "description": "Required for temporary storage of app downloads before RDP install."
       },
       "tcp-socket": {
         "description": "Required to connect to the local debugger for RDP installations."
+      },
+      "engmode-extension": {
+        "description": "Required for extended debugging and sideloading features."
       }
     },
     "origin": "app://kaistore.omnisd"
