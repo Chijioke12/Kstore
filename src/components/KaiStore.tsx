@@ -604,7 +604,7 @@ export default function KaiStore({
     }
 
     const nav = navigator as any;
-    const hasRealMozApps = !!(nav.mozApps && (nav.mozApps.install || nav.mozApps.installPackage));
+    const hasRealMozApps = !!nav.mozApps;
 
     if (hasRealMozApps) {
       if (app.type === 'hosted') {
@@ -650,65 +650,24 @@ export default function KaiStore({
           setErrorMessage(e.message || 'Install failed');
         }
       } else {
-        // Use official OTA installPackage method
-        if (typeof nav.mozApps.installPackage === 'function' && app.manifest_url) {
-          try {
-            const request = nav.mozApps.installPackage(app.manifest_url);
-            request.onsuccess = function(this: any) {
-              const appObj = request.result || this.result;
-              if (appObj) {
-                console.log('App installPackage request succeeded:', appObj);
-                appObj.ondownloaderror = (e: any) => {
-                  const dError = appObj.downloadError ? appObj.downloadError.name : 'Unknown download error';
-                  console.error('ondownloaderror fired:', dError, e);
-                  setDownloadStep('ERROR');
-                  setErrorMessage(`Bg pkg download fail: ${dError}. Url: ${app.manifest_url}`);
-                };
-              }
-              setDownloadStep('INSTALLED');
-              onInstallApp(appId, app.version);
-              setDownloadProgress(null);
-              setTimeout(() => {
-                setDownloadStep('IDLE');
-              }, 2000);
-            };
-            request.onerror = function(this: any) {
-              const reqErr = request.error || this.error;
-              let errName = 'Unknown error';
-              let errMsg = '';
-              if (reqErr) {
-                errName = reqErr.name || reqErr.toString();
-                errMsg = reqErr.message || '';
-              }
-              console.error('installPackage failed request.onerror:', reqErr);
-              setDownloadStep('ERROR');
-              setErrorMessage(`Pkg install err: [${errName}]${errMsg ? ' ' + errMsg : ''}. Url: ${app.manifest_url}`);
-            };
-            return;
-          } catch (e: any) {
-            setDownloadStep('ERROR');
-            setErrorMessage(e.message || 'Install failed');
+        // Self debug protocol method for packaged apps
+        const installer = new KaiOSInstaller();
+        installer.installAppViaRDP(app.download_url || app.manifest_url, (p) => {
+          if (p < 100) {
+              setDownloadProgress(Math.round(p));
           }
-        } else {
-          // If official API is not available, try the RDP method
-          const installer = new KaiOSInstaller();
-          installer.installAppViaRDP(app.manifest_url, (p) => {
-            if (p < 100) {
-                setDownloadProgress(Math.round(p));
-            }
-          }).then(() => {
-             setDownloadStep('INSTALLED');
-             onInstallApp(appId, app.version);
-             setDownloadProgress(null);
-             setTimeout(() => {
-               setDownloadStep('IDLE');
-             }, 2000);
-          }).catch(err => {
-             console.error("RDP install failed", err);
-             setDownloadStep('ERROR');
-             setErrorMessage('RDP Install fail: ' + (err.message || err.toString()));
-          });
-        }
+        }).then(() => {
+           setDownloadStep('INSTALLED');
+           onInstallApp(appId, app.version);
+           setDownloadProgress(null);
+           setTimeout(() => {
+             setDownloadStep('IDLE');
+           }, 2000);
+        }).catch(err => {
+           console.error("RDP install failed", err);
+           setDownloadStep('ERROR');
+           setErrorMessage('RDP Install fail: ' + (err.message || err.toString()));
+        });
       }
     } else {
       // Simulation mode
