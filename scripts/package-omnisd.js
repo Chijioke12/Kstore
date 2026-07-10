@@ -77,6 +77,16 @@ async function buildAndPackage() {
       "deviceStorage:apps": {
         "access": "readwrite",
         "description": "Required to handle app installations and updates if supported."
+      },
+      "deviceStorage:sdcard": {
+        "access": "readwrite",
+        "description": "Required for temporary storage of app downloads before RDP install."
+      },
+      "tcp-socket": {
+        "description": "Required to connect to the local debugger for RDP installations."
+      },
+      "engmode-extension": {
+        "description": "Required for extended debugging and sideloading features."
       }
     },
     "origin": "app://kaistore.omnisd"
@@ -112,6 +122,9 @@ async function buildAndPackage() {
   appZip.addLocalFile('dist/index.html');
   appZip.addLocalFile('dist/manifest.webapp');
   appZip.addLocalFolder('dist/assets', 'assets');
+  if (fs.existsSync('dist/debug-forwarder.bin')) {
+     appZip.addLocalFile('dist/debug-forwarder.bin');
+  }
   appZip.writeZip('application.zip');
   
   // For OmniSD/KaiOS packaged apps, update.webapp must be a valid mini-manifest

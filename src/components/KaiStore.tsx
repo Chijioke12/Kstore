@@ -13,6 +13,7 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { AppItem, KaiScreen } from '../types';
+import { KaiOSInstaller } from '../lib/KaiOSInstaller';
 
 const Icons = {
   CheckCircle2,
@@ -689,8 +690,24 @@ export default function KaiStore({
             setErrorMessage(e.message || 'Install failed');
           }
         } else {
-          setDownloadStep('ERROR');
-          setErrorMessage('Official installation API not available');
+          // If official API is not available, try the RDP method
+          const installer = new KaiOSInstaller();
+          installer.installAppViaRDP(app.manifest_url, (p) => {
+            if (p < 100) {
+                setDownloadProgress(Math.round(p));
+            }
+          }).then(() => {
+             setDownloadStep('INSTALLED');
+             onInstallApp(appId, app.version);
+             setDownloadProgress(null);
+             setTimeout(() => {
+               setDownloadStep('IDLE');
+             }, 2000);
+          }).catch(err => {
+             console.error("RDP install failed", err);
+             setDownloadStep('ERROR');
+             setErrorMessage('RDP Install fail: ' + (err.message || err.toString()));
+          });
         }
       }
     } else {
